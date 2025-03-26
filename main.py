@@ -17,5 +17,41 @@ class MyPlugin(Star):
         logger.info(message_chain)
         yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!") # 发送一条纯文本消息
 
+    @filter.command("userinfo")
+    async def userinfo(self, event: AstrMessageEvent):
+        '''获取用户信息的指令，显示当前用户的所有可用信息'''
+        # 获取用户基本信息
+        user_id = event.get_sender_id()
+        user_name = event.get_sender_name()
+        
+        # 获取消息相关信息
+        message_obj = event.message_obj
+        sender_info = message_obj.sender
+        
+        # 构建信息字符串
+        info_str = "用户信息如下：\n"
+        info_str += f"用户ID: {user_id}\n"
+        info_str += f"用户名称: {user_name}\n"
+        
+        # 添加消息对象中的信息
+        info_str += f"消息ID: {message_obj.message_id}\n"
+        info_str += f"会话ID: {message_obj.session_id}\n"
+        info_str += f"自身ID: {message_obj.self_id}\n"
+        info_str += f"群组ID: {message_obj.group_id}\n"
+        info_str += f"时间戳: {message_obj.timestamp}\n"
+        
+        # 添加发送者详细信息
+        info_str += f"发送者详细信息:\n"
+        info_str += f"  群名片: {sender_info.display_name if hasattr(sender_info, 'display_name') else '无'}\n"
+        info_str += f"  权限: {sender_info.permission if hasattr(sender_info, 'permission') else '无'}\n"
+        
+        # 尝试获取更多可能的发送者信息
+        for key, value in vars(sender_info).items():
+            if key not in ['display_name', 'permission']:
+                info_str += f"  {key}: {value}\n"
+        
+        # 返回所有信息
+        yield event.plain_result(info_str)
+
     async def terminate(self):
         '''可选择实现 terminate 函数，当插件被卸载/停用时会调用。'''
