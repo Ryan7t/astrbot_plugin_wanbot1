@@ -1,6 +1,7 @@
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from .Commands import answer_book_command
+import astrbot.api.message_components as Comp
 
 @register("wanbot1", "YourName", "一个带有多个实用功能的插件", "1.0.0")
 class MyPlugin(Star):
@@ -59,6 +60,26 @@ class MyPlugin(Star):
         # 调用外部实现
         async for result in answer_book_command(self, event):
             yield result
+
+    @filter.command("测试图片")
+    async def test_image(self, event: AstrMessageEvent):
+        '''测试发送图片功能'''
+        print("执行测试图片命令")
+        
+        # 发送本地图片测试
+        message2 = [
+            Comp.Plain(text="这是一张本地测试图片："),
+            Comp.Image(file="data/plugins/astrbot_plugin_wanbot1/test.jpg")
+        ]
+        yield MessageEventResult(message2)
+        
+        # 如果需要同时测试网络图片，可以取消下面的注释
+        # 发送网络图片测试
+        # message = [
+        #     Comp.Plain(text="这是一张网络测试图片："),
+        #     Comp.Image(file="https://picsum.photos/300/200")
+        # ]
+        # yield MessageEventResult(message)
 
     async def terminate(self):
         '''可选择实现 terminate 函数，当插件被卸载/停用时会调用。'''
