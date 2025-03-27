@@ -1,6 +1,7 @@
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from .Commands import answer_book_command
+from .Commands.story import one_sentence_story_command
 import astrbot.api.message_components as Comp
 
 @register("wanbot1", "YourName", "一个带有多个实用功能的插件", "1.0.0")
@@ -80,6 +81,13 @@ class MyPlugin(Star):
         #     Comp.Image(file="https://picsum.photos/300/200")
         # ]
         # yield MessageEventResult(message)
+
+    @filter.command("一句话故事")
+    async def one_sentence_story(self, event: AstrMessageEvent):
+        '''一句话故事：提供一个主题，获得一个简短有意思的故事种子'''
+        # 调用外部实现
+        async for result in one_sentence_story_command(self, event):
+            yield result
 
     async def terminate(self):
         '''可选择实现 terminate 函数，当插件被卸载/停用时会调用。'''
