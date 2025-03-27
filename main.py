@@ -4,11 +4,14 @@ from .Commands import answer_book_command
 from .Commands.story import one_sentence_story_command
 from .Commands.fortune import fortune_command
 import astrbot.api.message_components as Comp
+from astrbot.api import AstrBotConfig
 
 @register("wanbot1", "YourName", "一个带有多个实用功能的插件", "1.0.0")
 class MyPlugin(Star):
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
+        self.config = config
+        print(f"wanbot1插件配置: {self.config}")
     
     # 注册指令的装饰器。指令名为 helloworld。注册成功后，发送 `/helloworld` 就会触发这个指令，并回复 `你好, {user_name}!`
     @filter.command("helloworld")

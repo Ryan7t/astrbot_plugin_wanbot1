@@ -1,0 +1,59 @@
+{
+    "answer_book_config": {
+        "description": "答案之书配置",
+        "type": "object",
+        "items": {
+            "prompt_type": {
+                "description": "提示词类型",
+                "type": "string",
+                "options": ["系统预设", "自定义"],
+                "default": "系统预设",
+                "hint": "选择使用系统预设的提示词，或者使用自定义提示词"
+            },
+            "custom_prompt": {
+                "description": "自定义提示词内容",
+                "type": "string",
+                "default": "",
+                "hint": "在这里输入您的自定义提示词"
+            }
+        }
+    },
+    "fortune_config": {
+        "description": "今日运势配置",
+        "type": "object",
+        "items": {
+            "prompt_type": {
+                "description": "提示词类型",
+                "type": "string",
+                "options": ["系统预设", "自定义"],
+                "default": "系统预设",
+                "hint": "选择使用系统预设的提示词，或者使用自定义提示词"
+            },
+            "custom_prompt": {
+                "description": "自定义提示词内容",
+                "type": "string",
+                "default": "",
+                "hint": "在这里输入您的自定义提示词"
+            }
+        }
+    },
+    "story_config": {
+        "description": "一句话故事配置",
+        "type": "object",
+        "items": {
+            "prompt_type": {
+                "description": "提示词类型",
+                "type": "string",
+                "options": ["系统预设", "自定义"],
+                "default": "系统预设",
+                "hint": "选择使用系统预设的提示词，或者使用自定义提示词"
+            },
+            "custom_prompt": {
+                "description": "自定义提示词内容",
+                "type": "string",
+                "default": "",
+                "hint": "在这里输入您的自定义提示词"
+            }
+        }
+    }
+} 

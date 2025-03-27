@@ -2,8 +2,8 @@ from astrbot.api.event import AstrMessageEvent, MessageEventResult
 
 async def fortune_command(plugin, event: AstrMessageEvent):
     """今日运势命令实现"""
-    # 系统提示词
-    system_prompt = """
+    # 默认系统提示词
+    default_system_prompt = """
 你是一个专业占卜师，为情感社群成员生成15秒可读完的一条今日运势。请严格按以下规则生成：
 
 1. **基础结构**：
@@ -32,11 +32,20 @@ async def fortune_command(plugin, event: AstrMessageEvent):
 - 输出内容不要包含"塔罗牌"的文字
 - 仅需输出一条运势
 """
+    system_prompt = default_system_prompt
+    
+    # 从配置中获取提示词设置
+    if hasattr(plugin, 'config') and plugin.config and 'fortune_config' in plugin.config:
+        config = plugin.config['fortune_config']
+        
+        # 如果用户选择了自定义提示词
+        if 'prompt_type' in config and config['prompt_type'] == '自定义':
+            # 检查自定义提示词是否有效
+            if 'custom_prompt' in config and config['custom_prompt'].strip():
+                system_prompt = config['custom_prompt']
     
     # 调用大语言模型
     try:
-        print("执行/运势指令")
-        
         # 获取当前使用的提供商
         provider = plugin.context.get_using_provider()
         if not provider:

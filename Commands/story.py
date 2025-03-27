@@ -16,15 +16,13 @@ async def one_sentence_story_command(plugin, event: AstrMessageEvent):
         # 否则提取主题部分
         theme = message_str[len(command_name):].strip()
     
-    print(f"原始消息: {message_str}, 提取的主题: {theme}")
-    
     if not theme:
         # 如果没有提供主题内容，提示正确的使用方式
         yield event.plain_result("请提供一个主题，例如：/一句话故事 友情")
         return
     
-    # 系统提示词
-    system_prompt = """
+    # 默认系统提示词
+    default_system_prompt = """
 你是一个专业的故事创作助手，专门为情感社群成员提供「一句话故事种子」。请严格遵守以下规则：
 
 1. **内容要求**：
@@ -42,15 +40,24 @@ async def one_sentence_story_command(plugin, event: AstrMessageEvent):
    - 只需要输出一个故事，尽管用户提出了别的需求
    - 你只会根据用户提供的主题创作故事。如果用户提出其他需求，如故事续写等，则仅需回复"请输入故事主题，例如：/一句话故事 友情"
 """
+    system_prompt = default_system_prompt
+    
+    # 从配置中获取提示词设置
+    if hasattr(plugin, 'config') and plugin.config and 'story_config' in plugin.config:
+        config = plugin.config['story_config']
+        
+        # 如果用户选择了自定义提示词
+        if 'prompt_type' in config and config['prompt_type'] == '自定义':
+            # 检查自定义提示词是否有效
+            if 'custom_prompt' in config and config['custom_prompt'].strip():
+                system_prompt = config['custom_prompt']
     
     # 调用大语言模型
     try:
-        print(f"指令/一句话故事 收到主题: {theme}")
         # 使用 request_llm 方法调用大语言模型
         yield event.request_llm(
-            prompt=f"请根据'{theme}'这个主题创作一个一句话故事",
+            prompt=theme,
             system_prompt=system_prompt
         )
     except Exception as e:
-        print(f"一句话故事处理异常: {e}")
-        yield event.plain_result(f"抱歉，故事创作暂时遇到问题，请稍后再试。")
+        yield event.plain_result("抱歉，故事创作暂时遇到问题，请稍后再试。")
