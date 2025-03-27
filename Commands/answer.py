@@ -4,8 +4,20 @@ async def answer_book_command(plugin, event: AstrMessageEvent):
     """答案之书命令实现"""
     # 获取用户输入的问题
     message_str = event.message_str
-    # 移除命令前缀，获取实际问题内容
-    question = message_str.replace("/答案之书", "", 1).strip()
+    
+    # 从消息中提取问题，移除指令名称
+    command_name = "答案之书"
+    question = ""
+    
+    # 检查消息是否只包含指令名称或者有额外内容
+    if message_str.strip() == command_name:
+        # 如果消息只包含指令名称，则问题为空
+        question = ""
+    else:
+        # 否则提取问题部分
+        question = message_str[len(command_name):].strip()
+    
+    print(f"答案之书收到问题: {question}")
     
     if not question:
         # 如果没有提供问题内容，提示正确的使用方式
@@ -17,7 +29,6 @@ async def answer_book_command(plugin, event: AstrMessageEvent):
     
     # 调用大语言模型
     try:
-        print(f"答案之书收到问题: {question}")
         # 获取用户当前会话ID
         uid = event.unified_msg_origin
         curr_cid = await plugin.context.conversation_manager.get_curr_conversation_id(uid)

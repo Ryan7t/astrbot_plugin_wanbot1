@@ -50,16 +50,16 @@ async def fortune_command(plugin, event: AstrMessageEvent):
         )
         
         # 获取模型回复文本
-        # if llm_response.role == "assistant":
-        #     fortune_text = llm_response.completion_text
+        if llm_response.role == "assistant":
+            fortune_text = llm_response.completion_text
             
-        #     # 添加免责声明
-        #     result_text = fortune_text + "\n\n仅供娱乐|相信科学|请勿迷信"
+            # 添加免责声明
+            result_text = fortune_text + "\n\n仅供娱乐|相信科学|请勿迷信"
             
-        #     # 发送结果
-        #     yield event.plain_result(result_text)
-        # else:
-        #     yield event.plain_result("抱歉，获取今日运势失败，请稍后再试。")
+            # 发送结果
+            yield event.plain_result(result_text)
+        else:
+            yield event.plain_result("抱歉，获取今日运势失败，请稍后再试。")
             
     except Exception as e:
         print(f"运势处理异常: {e}")
