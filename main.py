@@ -2,6 +2,7 @@ from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from .Commands import answer_book_command
 from .Commands.story import one_sentence_story_command
+from .Commands.fortune import fortune_command
 import astrbot.api.message_components as Comp
 
 @register("wanbot1", "YourName", "一个带有多个实用功能的插件", "1.0.0")
@@ -87,6 +88,13 @@ class MyPlugin(Star):
         '''一句话故事：提供一个主题，获得一个简短有意思的故事种子'''
         # 调用外部实现
         async for result in one_sentence_story_command(self, event):
+            yield result
+
+    @filter.command("今日运势")
+    async def fortune(self, event: AstrMessageEvent):
+        '''今日运势：获取你的每日运势预测'''
+        # 调用外部实现
+        async for result in fortune_command(self, event):
             yield result
 
     async def terminate(self):
