@@ -140,9 +140,10 @@ class MyPlugin(Star):
             yield result
             
     @filter.command("获取频道成员数量")
-    async def get_members(self, event: AstrMessageEvent):
+    async def get_members(self, event: AstrMessageEvent, *args, **kwargs):
         '''获取频道成员数量：获取当前频道的成员数量和成员列表'''
         logger.info("开始执行获取频道成员数量命令")
+        logger.info(f"接收到的参数: args={args}, kwargs={kwargs}")
         
         # 获取频道ID
         guild_id = event.message_obj.group_id
@@ -204,9 +205,10 @@ class MyPlugin(Star):
             yield event.plain_result(f"获取频道成员时发生错误：{str(e)}")
 
     @filter.command("移出")
-    async def kick_member(self, event: AstrMessageEvent):
+    async def kick_member(self, event: AstrMessageEvent, *args, **kwargs):
         '''移出：移出指定的频道成员，格式为 /移出 原因 @成员'''
         logger.info("开始执行移出成员命令")
+        logger.info(f"接收到的参数: args={args}, kwargs={kwargs}")
         
         # 获取频道ID
         guild_id = event.message_obj.group_id
