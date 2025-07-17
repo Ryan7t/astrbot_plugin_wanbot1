@@ -135,83 +135,49 @@ class MyPlugin(Star):
 
     # ----------------- QQ 频道相关功能  -----------------
 
-    async def _get_bot_creds(self):
-        """从配置或环境变量读取 QQ Bot 的凭据。
+    async def _fetch_members_count(self, channel_id: str):
+        """使用 AstrBot QQOFFICIAL 适配器拉取成员数量 (已由框架封装鉴权)。"""
+        from astrbot.api.event import filter as _f  # 避免顶部命名冲突
 
-        Returns:
-            Tuple(app_id:str, token:str)
-        """
-        import os
+        platform = self.context.get_platform(_f.PlatformAdapterType.QQOFFICIAL)
+        if not platform:
+            raise RuntimeError("当前未加载 QQ 官方平台适配器")
 
-        # 优先从插件配置读取
-        app_id = None
-        token = None
-        if self.config and isinstance(self.config, dict):
-            app_id = self.config.get("qq_bot_app_id")
-            token = self.config.get("qq_bot_token")
+        client = platform.get_client()
 
-        # 其次尝试从环境变量读取
-        app_id = app_id or os.getenv("QQ_BOT_APP_ID")
-        token = token or os.getenv("QQ_BOT_TOKEN")
+        limit = 1000
+        after = None
+        total = 0
 
-        return app_id, token
+        while True:
+            params = {"limit": str(limit)}
+            if after:
+                params["after"] = after
+            resp = await client.request("GET", f"/channels/{channel_id}/members", params=params)
+            members = resp or []
+            total += len(members)
+            if len(members) < limit:
+                break
+            after = members[-1]["user"]["id"]
+        return total
 
-    async def _build_auth_header(self):
-        """构造 QQ 频道请求头"""
-        app_id, token = await self._get_bot_creds()
-        if not app_id or not token:
-            raise RuntimeError("未找到 QQ Bot 凭据，请在插件配置或环境变量中提供 qq_bot_app_id 和 qq_bot_token")
-        return {
-            "Authorization": f"Bot {app_id}.{token}",
-            "Content-Type": "application/json"
+    async def _kick_member(self, channel_id: str, user_id: str, reason: str = "", delete_days: int = 7):
+        """调用 AstrBot QQOFFICIAL 客户端踢人接口。"""
+        from astrbot.api.event import filter as _f
+
+        platform = self.context.get_platform(_f.PlatformAdapterType.QQOFFICIAL)
+        if not platform:
+            raise RuntimeError("当前未加载 QQ 官方平台适配器")
+
+        client = platform.get_client()
+
+        payload = {
+            "add_blacklist": True,
+            "delete_history_msg_days": delete_days,
+            "reason": reason,
         }
 
-    async def _fetch_members_count(self, channel_id: str) -> int:
-        """分页拉取成员列表并统计数量。"""
-        import aiohttp
-
-        headers = await self._build_auth_header()
-        base_url = f"https://api.sgroup.qq.com/channels/{channel_id}/members"
-
-        limit = 1000  # QQ 接口单次最大 1000
-        after = "0"
-        total_count = 0
-
-        async with aiohttp.ClientSession() as session:
-            while True:
-                params = {"limit": str(limit)}
-                if after and after != "0":
-                    params["after"] = after
-                async with session.get(base_url, headers=headers, params=params) as resp:
-                    if resp.status != 200:
-                        text = await resp.text()
-                        print(f"[获取成员列表] 请求失败 status={resp.status} body={text}")
-                        raise RuntimeError(f"QQ接口返回错误: {resp.status}")
-                    data = await resp.json()
-                    members = data if isinstance(data, list) else data.get("data", [])
-                    total_count += len(members)
-                    if len(members) < limit:
-                        break  # 已到最后一页
-                    after = members[-1]["user"].get("id")  # 下一页游标
-        return total_count
-
-    async def _kick_member(self, channel_id: str, user_id: str, reason: str = ""):
-        """移除成员 (踢人)。"""
-        import aiohttp
-
-        headers = await self._build_auth_header()
-        url = f"https://api.sgroup.qq.com/channels/{channel_id}/members/{user_id}"
-
-        payload = {"add_blacklist": 1, "delete_history_msg_days": 7}
-        if reason:
-            payload["reason"] = reason
-
-        async with aiohttp.ClientSession() as session:
-            async with session.delete(url, headers=headers, json=payload) as resp:
-                text = await resp.text()
-                print(f"[踢人] status={resp.status} body={text}")
-                if resp.status not in (200, 204):
-                    raise RuntimeError(f"踢人失败: {resp.status}, body={text}")
+        await client.request("DELETE", f"/channels/{channel_id}/members/{user_id}", json=payload)
 
     @filter.command("获取频道成员数量")
     async def cmd_get_member_count(self, event: AstrMessageEvent):
