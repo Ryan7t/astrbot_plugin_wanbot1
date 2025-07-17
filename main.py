@@ -6,6 +6,10 @@ from .Commands.fortune import fortune_command
 import astrbot.api.message_components as Comp
 from astrbot.api import AstrBotConfig
 
+# 启动命令
+# 在D:\桌面\机器人\AstrBotLauncher-0.1.5.5目录下运行以下命令：
+# D:\桌面\机器人\AstrBotLauncher-0.1.5.5\launcher_astrbot_en.bat
+
 @register("wanbot1", "YourName", "一个带有多个实用功能的插件", "1.0.0")
 class MyPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
