@@ -153,53 +153,51 @@ class MyPlugin(Star):
             return
 
         try:
-            # 构建请求URL
-            base_url = "https://api.sgroup.qq.com"
-            api_path = f"/guilds/{guild_id}/members"
-            url = base_url + api_path
+            # 获取适配器
+            adapter = self.context.adapter
+            if not hasattr(adapter, 'bot') or not hasattr(adapter.bot, 'api'):
+                error_msg = "无法获取QQ机器人API接口"
+                logger.error(error_msg)
+                yield event.plain_result(error_msg)
+                return
             
-            # 构建请求头
-            headers = {
-                "Authorization": f"Bot {self.config.get('qq_bot_token', '')}", 
-                "Content-Type": "application/json"
-            }
+            # 获取机器人API
+            bot_api = adapter.bot.api
+            logger.info(f"成功获取QQ机器人API接口，开始获取频道成员列表")
             
-            # 请求参数
-            params = {
-                "limit": 400  # 获取最大数量的成员
-            }
+            # 调用API获取成员列表
+            params = {"limit": 400}  # 获取最大数量的成员
+            logger.info(f"请求参数: guild_id={guild_id}, params={params}")
+            
+            # 构建请求路由
+            from botpy.types.route import Route
+            route = Route("GET", f"/guilds/{guild_id}/members", params=params)
             
             # 发送请求
-            logger.info(f"发送请求：URL={url}, 参数={params}")
-            response = requests.get(url, headers=headers, params=params)
-            logger.info(f"获取到响应：状态码={response.status_code}")
+            response = await bot_api._http.request(route)
+            logger.info(f"成功获取成员列表响应")
             
-            if response.status_code == 200:
-                # 解析响应
-                members = response.json()
-                member_count = len(members)
-                logger.info(f"成功获取成员列表，共{member_count}个成员")
-                
-                # 构建响应消息
-                result_message = f"当前频道共有 {member_count} 个成员\n\n"
-                result_message += "成员列表（最多显示前10个）：\n"
-                
-                # 只显示前10个成员以避免消息过长
-                for i, member in enumerate(members[:10]):
-                    user = member.get("user", {})
-                    username = user.get("username", "未知用户")
-                    nick = member.get("nick", "")
-                    display_name = nick if nick else username
-                    result_message += f"{i+1}. {display_name}\n"
-                
-                if member_count > 10:
-                    result_message += f"... 还有 {member_count - 10} 个成员未显示"
-                
-                yield event.plain_result(result_message)
-            else:
-                error_message = f"获取频道成员失败，状态码：{response.status_code}，响应：{response.text}"
-                logger.error(error_message)
-                yield event.plain_result(f"获取频道成员失败：{response.status_code}")
+            # 解析响应
+            members = response
+            member_count = len(members)
+            logger.info(f"成功获取成员列表，共{member_count}个成员")
+            
+            # 构建响应消息
+            result_message = f"当前频道共有 {member_count} 个成员\n\n"
+            result_message += "成员列表（最多显示前10个）：\n"
+            
+            # 只显示前10个成员以避免消息过长
+            for i, member in enumerate(members[:10]):
+                user = member.get("user", {})
+                username = user.get("username", "未知用户")
+                nick = member.get("nick", "")
+                display_name = nick if nick else username
+                result_message += f"{i+1}. {display_name}\n"
+            
+            if member_count > 10:
+                result_message += f"... 还有 {member_count - 10} 个成员未显示"
+            
+            yield event.plain_result(result_message)
         except Exception as e:
             error_message = f"获取频道成员时发生异常：{str(e)}"
             logger.error(error_message)
@@ -218,64 +216,99 @@ class MyPlugin(Star):
             yield event.plain_result(error_msg)
             return
         
-        # 解析命令参数
-        message_str = event.message_str
+        # 获取原始消息对象和消息链
+        message_obj = event.message_obj
         message_chain = event.get_messages()
+        message_str = event.message_str
         
-        # 检查是否有At消息段
+        # 详细记录消息信息用于调试
+        logger.info(f"消息原始字符串: {message_str}")
+        logger.info(f"消息对象类型: {type(message_obj)}")
+        logger.info(f"消息链类型: {type(message_chain)}")
+        logger.info(f"消息链长度: {len(message_chain)}")
+        
+        # 详细记录每个消息段
+        for i, msg_comp in enumerate(message_chain):
+            logger.info(f"消息段 {i}: 类型={msg_comp.type}, 内容={msg_comp}, 属性={dir(msg_comp)}")
+            if hasattr(msg_comp, 'data'):
+                logger.info(f"消息段 {i} 的data属性: {msg_comp.data}")
+            if msg_comp.type == 'at':
+                logger.info(f"检测到At消息段: {msg_comp}")
+                for key, value in vars(msg_comp).items():
+                    logger.info(f"At消息段属性 {key}: {value}")
+        
+        # 尝试获取被@的用户ID
+        target_user_id = None
+        
+        # 方法1: 检查消息链中是否有标准At类型
         at_segments = [msg for msg in message_chain if msg.type == "at"]
-        if not at_segments:
-            error_msg = "使用方法错误：请使用 /移出 原因 @成员"
-            logger.error(error_msg)
-            yield event.plain_result(error_msg)
-            return
+        if at_segments:
+            logger.info(f"找到标准At消息段: {at_segments}")
+            # 尝试从at消息段中获取用户ID (qq字段)
+            if hasattr(at_segments[0], 'qq'):
+                target_user_id = at_segments[0].qq
+                logger.info(f"从At.qq属性获取用户ID: {target_user_id}")
+            elif hasattr(at_segments[0], 'data') and 'qq' in at_segments[0].data:
+                target_user_id = at_segments[0].data['qq']
+                logger.info(f"从At.data['qq']获取用户ID: {target_user_id}")
         
-        # 获取被At的用户ID
-        target_user_id = at_segments[0].data.get("qq", "")
+        # 方法2: 如果无法从标准方式获取，尝试从文本中解析QQ频道的特殊格式
         if not target_user_id:
-            error_msg = "无法获取目标成员ID"
+            import re
+            at_matches = re.findall(r'<@!(\d+)>', message_str)
+            if at_matches:
+                target_user_id = at_matches[0]
+                logger.info(f"从文本格式<@!ID>解析出用户ID: {target_user_id}")
+        
+        # 如果仍然没有找到用户ID
+        if not target_user_id:
+            error_msg = "无法识别要移出的成员，请确保正确使用@提及成员"
             logger.error(error_msg)
             yield event.plain_result(error_msg)
             return
-        
-        # 提取移出原因 (去掉命令和@部分)
-        reason = message_str.split(f"@{target_user_id}")[0].strip()
-        if reason.startswith("移出 "):
-            reason = reason[3:].strip()
             
-        logger.info(f"解析出参数：target_user_id={target_user_id}, reason={reason}")
+        # 提取移出原因
+        reason = message_str
+        # 移除可能的@文本格式
+        reason = re.sub(r'<@!\d+>', '', reason)
+        # 移除命令部分
+        reason = reason.replace("/移出", "").strip()
+            
+        logger.info(f"最终解析结果: target_user_id={target_user_id}, reason={reason}")
         
         try:
-            # 构建请求URL
-            base_url = "https://api.sgroup.qq.com"
-            api_path = f"/guilds/{guild_id}/members/{target_user_id}"
-            url = base_url + api_path
+            # 获取适配器
+            adapter = self.context.adapter
+            if not hasattr(adapter, 'bot') or not hasattr(adapter.bot, 'api'):
+                error_msg = "无法获取QQ机器人API接口"
+                logger.error(error_msg)
+                yield event.plain_result(error_msg)
+                return
             
-            # 构建请求头
-            headers = {
-                "Authorization": f"Bot {self.config.get('qq_bot_token', '')}",
-                "Content-Type": "application/json"
-            }
+            # 获取机器人API
+            bot_api = adapter.bot.api
+            logger.info(f"成功获取QQ机器人API接口，开始移出频道成员")
             
-            # 构建请求体
+            # 构建请求数据
             data = {
                 "add_blacklist": True,  # 将用户添加到黑名单
                 "delete_history_msg_days": 0  # 不删除历史消息
             }
             
-            # 发送请求
-            logger.info(f"发送请求：URL={url}, 数据={data}")
-            response = requests.delete(url, headers=headers, json=data)
-            logger.info(f"获取到响应：状态码={response.status_code}")
+            # 构建请求路由
+            from botpy.types.route import Route
+            route = Route("DELETE", f"/guilds/{guild_id}/members/{target_user_id}")
             
-            if response.status_code == 204:
-                success_message = f"已成功将成员移出频道\n原因：{reason}"
-                logger.info(success_message)
-                yield event.plain_result(success_message)
-            else:
-                error_message = f"移出成员失败，状态码：{response.status_code}，响应：{response.text}"
-                logger.error(error_message)
-                yield event.plain_result(f"移出成员失败：{response.status_code}")
+            # 发送请求
+            logger.info(f"请求参数: guild_id={guild_id}, target_user_id={target_user_id}, data={data}")
+            response = await bot_api._http.request(route, json=data)
+            
+            # 检查响应
+            logger.info(f"移出成员响应: {response}")
+            
+            success_message = f"已成功将成员移出频道\n原因：{reason}"
+            logger.info(success_message)
+            yield event.plain_result(success_message)
         except Exception as e:
             error_message = f"移出成员时发生异常：{str(e)}"
             logger.error(error_message)
