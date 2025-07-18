@@ -7,6 +7,12 @@ import astrbot.api.message_components as Comp
 from astrbot.api import AstrBotConfig
 import httpx  # 新增: 用于异步 HTTP 请求
 import time  # 新增，用于缓存 token 过期时间
+from .Commands.channel_management import (
+    get_guild_details_impl,
+    kick_member_impl,
+    kick_member_inline_impl,
+    debug_platforms_impl,
+)
 
 # 启动命令
 # 在D:\桌面\机器人\AstrBotLauncher-0.1.5.5目录下运行以下命令：
@@ -14,6 +20,11 @@ import time  # 新增，用于缓存 token 过期时间
 
 @register("wanbot1", "YourName", "一个带有多个实用功能的插件", "1.0.0")
 class MyPlugin(Star):
+    # 待办事项:
+    # - 完善踢出逻辑，确保兼容各种 @ 格式和纯数字 ID
+    # - 增加对接口错误码的友好提示和重试机制
+    # - 添加单元测试覆盖 /获取频道详细 和 /踢出 命令
+    # - 优化日志输出，方便调试和运维
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
         self.config = config
@@ -135,127 +146,58 @@ class MyPlugin(Star):
         async for result in fortune_command(self, event):
             yield result
 
+    @filter.event_message_type(filter.EventMessageType.ALL, priority=1)
+    async def inline_kick_handler(self, event: AstrMessageEvent):
+        '''捕获无空格`/踢出@成员`或`/踢出<@!ID>`格式并执行踢人'''  
+        # 委托给 channel_management.kick_member_inline_impl
+        async for r in kick_member_inline_impl(self, event):
+            yield r
+  
     @filter.command("获取频道详细")
     async def get_guild_details(self, event: AstrMessageEvent):
         '''获取频道详细信息并展示部分频道成员列表'''
-        # 修正频道 ID：AstrBot 默认的 session_id 为子频道 ID，实际调用需父频道 (guild) ID
-        raw_msg = getattr(event.message_obj, "raw_message", None)
-        # 优先使用官方原始消息中的 guild_id 字段
-        api_guild_id = (
-            getattr(raw_msg, "guild_id", None)
-            or getattr(raw_msg, "guildId", None)
-        )
-        # fallback 到 session_id 或 group_id
-        api_guild_id = api_guild_id or event.get_group_id() or event.get_session_id()
-        if not api_guild_id:
-            yield event.plain_result("未能获取频道 ID，请在频道/群组内使用该指令。")
-            return
-
-        # 在回复中加入 AstrBot 取到的 guild_id 及官方原始 guild_id / channel_id
-        raw_guild_id = getattr(raw_msg, "guild_id", None) or getattr(raw_msg, "guildId", None)
-        raw_channel_id = getattr(raw_msg, "channel_id", None) or getattr(raw_msg, "channelId", None)
-        prefix = (
-            f"当前框架获取的群组id: {api_guild_id}\n"
-            f"官方原始 raw.guild_id: {raw_guild_id}\n"
-            f"官方 channel_id: {raw_channel_id}\n"
-        )
-        headers = await self._make_headers()
-        if not headers:
-            err = getattr(self, "_last_token_error", "<未知错误>")
-            yield event.plain_result(prefix + f"无法获取 QQ Bot Token，原因: {err}")
-            return
-
-        base_url = "https://api.sgroup.qq.com"
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            # 使用 corrected guild_id 调用频道详情接口
-            resp_guild = await client.get(f"{base_url}/guilds/{api_guild_id}", headers=headers)
-            if resp_guild.status_code != 200:
-                yield event.plain_result(prefix + f"获取频道信息失败，状态码 {resp_guild.status_code}，{resp_guild.text}")
-                return
-            guild_data = resp_guild.json()
-
-            # 获取频道成员，最多拉取 100 条
-            resp_members = await client.get(
-                f"{base_url}/guilds/{api_guild_id}/members?limit=100",
-                headers=headers,
-            )
-            member_names = []
-            if resp_members.status_code == 200:
-                members_data = resp_members.json()
-                member_names = [m.get("nick", m.get("user", {}).get("username", "未知")) for m in members_data]
-            else:
-                member_names.append("<成员列表获取失败>")
-
-        # 根据官方文档返回完整的频道详情字段
-        info_lines = [
-            "频道详细信息：",
-            f"频道名称: {guild_data.get('name')}",
-            f"频道ID: {guild_data.get('id')}",
-            f"频道头像: {guild_data.get('icon') or '无'}",
-            f"所有者ID: {guild_data.get('owner_id')}",
-            f"是否创建者: {guild_data.get('owner')}",
-            f"加入时间: {guild_data.get('joined_at')}",
-            f"成员总数: {guild_data.get('member_count')}",
-            f"最大成员数: {guild_data.get('max_members')}",
-            f"描述: {guild_data.get('description') or '无'}",
-            f"已拉取成员数(前 100): {len(member_names)}",
-            "成员列表: " + ", ".join(member_names)
-        ]
-        yield event.plain_result(prefix + "\n".join(info_lines))
+        # 委托给 channel_management.get_guild_details_impl
+        async for r in get_guild_details_impl(self, event):
+            yield r
 
     @filter.command("踢出")
-    async def kick_member(self, event: AstrMessageEvent):
-        '''踢出频道成员，用法：/踢出 @成员'''
-        # 获取真实父频道 ID，避免使用子频道 sessionId
-        raw_msg = getattr(event.message_obj, "raw_message", None)
-        api_guild_id = (
-            getattr(raw_msg, "guild_id", None)
-            or getattr(raw_msg, "guildId", None)
-        ) or event.get_group_id() or event.get_session_id()
-        if not api_guild_id:
-            yield event.plain_result("未能获取频道 ID，请在频道/群组内使用该指令。")
-            return
+    async def kick_member(self, event: AstrMessageEvent, target_user_id: str = ""):
+        '''踢出频道成员，用法：1) /踢出 123456  2) /踢出 @成员'''
+        # 委托给 channel_management.kick_member_impl
+        async for r in kick_member_impl(self, event, target_user_id):
+            yield r
 
-        # 尝试从消息链中提取被@的用户 ID
-        target_user_id = None
-        for comp in event.get_messages():
-            if isinstance(comp, Comp.At):
-                target_user_id = str(getattr(comp, "qq", getattr(comp, "id", "")))
-                break
+    # 兼容“/踢出@成员”或“/踢出<@!ID>”等无空格格式
+    @filter.command("踢出")
+    async def kick_member_inline(self, event: AstrMessageEvent):
+        '''踢出频道成员，无空格格式处理。示例：/踢出<@!123456> 或 /踢出@成员'''
+        msg = event.message_str.strip()
+        if not msg.startswith("/踢出"):
+            return  # 不是目标格式
+        # 去掉前缀
+        remain = msg[len("/踢出"):]
+        # 尝试从文本中直接提取数字 ID
+        import re
+        m = re.search(r"(\d{5,})", remain)
+        target_id = m.group(1) if m else ""
+        # 如果文本内没提到数字，再从消息段 At 里找
+        if not target_id:
+            target_id = next((
+                str(getattr(c, "qq", getattr(c, "id", "")))
+                for c in event.get_messages() if isinstance(c, Comp.At)
+            ), "")
+        if not target_id:
+            return  # 无有效 ID，不继续执行，由另一个 handler 提示
+        # 将解析出的 ID 交给已有带参数的踢出函数复用逻辑
+        async for r in self.kick_member(event, target_id):
+            yield r
 
-        if not target_user_id:
-            yield event.plain_result("请使用 @用户 的方式指定要踢出的成员。")
-            return
-
-        headers = await self._make_headers()
-        if not headers:
-            err = getattr(self, "_last_token_error", "<未知错误>")
-            yield event.plain_result(f"无法获取 QQ Bot Token，原因: {err}")
-            return
-
-        base_url = "https://api.sgroup.qq.com"
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            # 使用 corrected guild_id 调用踢人接口
-            resp = await client.delete(
-                f"{base_url}/guilds/{api_guild_id}/members/{target_user_id}",
-                headers=headers,
-            )
-        if resp.status_code in (204, 200):
-            yield event.plain_result(f"已尝试将用户 {target_user_id} 踢出频道。")
-        else:
-            yield event.plain_result(f"踢出失败，状态码 {resp.status_code}，{resp.text}")
-
-    @filter.command("调试平台")
-    async def debug_platforms(self, event: AstrMessageEvent):
-        '''调试命令：列出所有已加载的平台适配器及其配置'''  
-        insts = self.context.platform_manager.get_insts()  
-        lines = []  
-        for p in insts:  
-            # 获取平台标识和配置  
-            name = getattr(p, 'name', None) or getattr(p, 'id', '<unknown>')  
-            cfg = getattr(p, 'config', {})  
-            lines.append(f"{name}: {cfg}")  
-        yield event.plain_result("\n".join(lines) or "无已加载平台实例。")
+    # @filter.command("调试平台")
+    # async def debug_platforms(self, event: AstrMessageEvent):
+    #     '''调试命令：列出所有已加载的平台适配器及其配置'''  
+    #     # 委托给 Commands/channel_management.debug_platforms_impl
+    #     async for r in debug_platforms_impl(self, event):
+    #         yield r
     
     def _get_app_credentials(self):
         """从 QQ 官方平台适配器读取 appId 与 Secret"""
