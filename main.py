@@ -9,8 +9,6 @@ import httpx  # 新增: 用于异步 HTTP 请求
 import time  # 新增，用于缓存 token 过期时间
 from .Commands.channel_management import (
     get_guild_details_impl,
-    kick_member_impl,
-    kick_member_inline_impl,
     debug_platforms_impl,
 )
 
@@ -146,50 +144,15 @@ class MyPlugin(Star):
         async for result in fortune_command(self, event):
             yield result
 
-    @filter.event_message_type(filter.EventMessageType.ALL, priority=1)
-    async def inline_kick_handler(self, event: AstrMessageEvent):
-        '''捕获无空格`/踢出@成员`或`/踢出<@!ID>`格式并执行踢人'''  
-        # 委托给 channel_management.kick_member_inline_impl
-        async for r in kick_member_inline_impl(self, event):
-            yield r
-  
+    # ---------------- 删除踢出指令相关代码开始 ----------------
+    # (inline_kick_handler、kick_member、kick_member_inline 等函数已移除)
+    # ---------------- 删除踢出指令相关代码结束 ----------------
+
     @filter.command("获取频道详细")
     async def get_guild_details(self, event: AstrMessageEvent):
         '''获取频道详细信息并展示部分频道成员列表'''
         # 委托给 channel_management.get_guild_details_impl
         async for r in get_guild_details_impl(self, event):
-            yield r
-
-    @filter.command("踢出")
-    async def kick_member(self, event: AstrMessageEvent, target_user_id: str = ""):
-        '''踢出频道成员，用法：1) /踢出 123456  2) /踢出 @成员'''
-        # 委托给 channel_management.kick_member_impl
-        async for r in kick_member_impl(self, event, target_user_id):
-            yield r
-
-    # 兼容“/踢出@成员”或“/踢出<@!ID>”等无空格格式
-    @filter.command("踢出")
-    async def kick_member_inline(self, event: AstrMessageEvent):
-        '''踢出频道成员，无空格格式处理。示例：/踢出<@!123456> 或 /踢出@成员'''
-        msg = event.message_str.strip()
-        if not msg.startswith("/踢出"):
-            return  # 不是目标格式
-        # 去掉前缀
-        remain = msg[len("/踢出"):]
-        # 尝试从文本中直接提取数字 ID
-        import re
-        m = re.search(r"(\d{5,})", remain)
-        target_id = m.group(1) if m else ""
-        # 如果文本内没提到数字，再从消息段 At 里找
-        if not target_id:
-            target_id = next((
-                str(getattr(c, "qq", getattr(c, "id", "")))
-                for c in event.get_messages() if isinstance(c, Comp.At)
-            ), "")
-        if not target_id:
-            return  # 无有效 ID，不继续执行，由另一个 handler 提示
-        # 将解析出的 ID 交给已有带参数的踢出函数复用逻辑
-        async for r in self.kick_member(event, target_id):
             yield r
 
     # @filter.command("调试平台")
@@ -198,7 +161,7 @@ class MyPlugin(Star):
     #     # 委托给 Commands/channel_management.debug_platforms_impl
     #     async for r in debug_platforms_impl(self, event):
     #         yield r
-    
+
     def _get_app_credentials(self):
         """从 QQ 官方平台适配器读取 appId 与 Secret"""
         # 获取 QQ 官方平台凭据逻辑：
