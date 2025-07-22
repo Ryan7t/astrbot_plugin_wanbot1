@@ -4,6 +4,7 @@ from .Commands import answer_book_command
 from .Commands.story import one_sentence_story_command
 from .Commands.fortune import fortune_command
 from .Commands.kick import kick_member_impl
+from .Commands.test import test_markdown_buttons_impl
 import astrbot.api.message_components as Comp
 from astrbot.api import AstrBotConfig
 import httpx  # 新增: 用于异步 HTTP 请求
@@ -12,6 +13,7 @@ from .Commands.channel_management import (
     get_guild_details_impl,
     debug_platforms_impl,
 )
+import json  # 用于处理JSON数据
 
 # 启动命令
 # 在D:\桌面\机器人\AstrBotLauncher-0.1.5.5目录下运行以下命令：
@@ -167,6 +169,13 @@ class MyPlugin(Star):
         # 委托给 channel_management.get_guild_details_impl
         async for r in get_guild_details_impl(self, event):
             yield r
+
+    @filter.command("测试")
+    async def test_markdown_buttons(self, event: AstrMessageEvent):
+        '''测试发送markdown和按钮消息'''
+        # 调用 Commands/test.py 中的实现
+        async for result in test_markdown_buttons_impl(self, event):
+            yield result
 
     # @filter.command("调试平台")
     # async def debug_platforms(self, event: AstrMessageEvent):
