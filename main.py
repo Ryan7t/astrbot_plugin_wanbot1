@@ -3,6 +3,7 @@ from astrbot.api.star import Context, Star, register
 from .Commands import answer_book_command
 from .Commands.story import one_sentence_story_command
 from .Commands.fortune import fortune_command
+from .Commands.kick import kick_member_impl
 import astrbot.api.message_components as Comp
 from astrbot.api import AstrBotConfig
 import httpx  # 新增: 用于异步 HTTP 请求
@@ -99,6 +100,11 @@ class MyPlugin(Star):
         help_text += "➤ 一句话故事 [主题] - 提供一个主题，获得一个简短有意思的故事种子\n"
         help_text += "➤ 今日运势 - 获取你的每日运势预测\n"
         
+        # help_text += "\n🔧 管理指令：\n"
+        # help_text += "➤ 获取频道详细 - 查看频道详细信息\n"
+        # help_text += "➤ 踢出 [原因]@[用户] - 将用户踢出频道（需要管理员权限）\n"
+        # help_text += "  示例：/踢出 违反规则@用户名\n"
+        
 
         # 返回帮助信息
         yield event.plain_result(help_text)
@@ -142,6 +148,13 @@ class MyPlugin(Star):
         '''今日运势：获取你的每日运势预测'''
         # 调用外部实现
         async for result in fortune_command(self, event):
+            yield result
+
+    @filter.command("踢出")
+    async def kick_member(self, event: AstrMessageEvent):
+        '''踢出：将用户踢出频道（需要管理员权限）'''
+        # 调用外部实现
+        async for result in kick_member_impl(self, event):
             yield result
 
     # ---------------- 删除踢出指令相关代码开始 ----------------
